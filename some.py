@@ -26,7 +26,8 @@ with con:
   # time range
   cur.execute ( "select min(post_date), max(post_date) from transactions" );
   x = cur.fetchone();
-  dt = datetime.strptime ( x[0], gctimeformat );
+  #dt = datetime.strptime ( x[0], gctimeformat );
+  dt = datetime.strptime ( '20150101000000', gctimeformat );
   verystart = dt - timedelta(dt.weekday())
   dt = datetime.strptime ( x[1], gctimeformat );
   veryend = dt - timedelta(dt.weekday()) + timedelta(7)
@@ -56,13 +57,19 @@ with con:
   # get weekly history for every expense account
   for acc in accs:
     weekst = verystart
-    cur.execute ( "select sum(cast(value_num as numeric(10,2))/100.0) from transactions t join splits s on s.tx_guid=t.guid "
-      "where s.account_guid=? "
-      "and reconcile_state in ('y','c','n')", (acc['guid'],) )
-    x = cur.fetchone()
+    balance = 0
     out ( ':'.join(acc['name']) )
     print ( x )
     while weekst < veryend:
       weekst += timedelta(7)
-      #print weekst, x
+      cur.execute ( "select sum(cast(value_num as numeric(10,2))/100.0) from transactions t join splits s on s.tx_guid=t.guid "
+        "where s.account_guid=? and t.post_date<? "
+        "and reconcile_state in ('y','c','n')", (acc['guid'],weekst.strftime(gctimeformat)) )
+      x = cur.fetchone()
+      if x[0] == None:
+        newbalance = 0
+      else:
+        newbalance = x[0]
+      print weekst, newbalance-balance
+      balance = newbalance
       
