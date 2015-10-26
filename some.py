@@ -58,19 +58,18 @@ with con:
   # get weekly history for every expense account
   for acc in accs:
     weekst = verystart
-    balance = 0
     out ( ':'.join(acc['name']) )
     print ( x )
     while weekst < veryend:
+      weeklo = weekst
       weekst += timedelta(7)
       cur.execute ( "select sum(cast(quantity_num as numeric(10,2))/100.0) from transactions t join splits s on s.tx_guid=t.guid "
-        "where s.account_guid=? and t.post_date<? "
-        "and reconcile_state in ('y','c','n')", (acc['guid'],weekst.strftime(gctimeformat)) )
+        "where s.account_guid=? and t.post_date>=? and t.post_date<?"
+        "and reconcile_state in ('y','c','n')", (acc['guid'],weeklo.strftime(gctimeformat),weekst.strftime(gctimeformat)) )
       x = cur.fetchone()
       if x[0] == None:
         newbalance = 0
       else:
         newbalance = x[0]
-      print weekst, newbalance-balance
-      balance = newbalance
+      print weeklo, newbalance
       
