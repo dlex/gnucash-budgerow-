@@ -15,7 +15,7 @@ gctimeformat = '%Y%m%d%H%M%S'
 #print sys.getdefaultencoding()
 #print sys.getfilesystemencoding()
 #print "Encoding is", sys.stdout.encoding
-out ( sys.argv[1].decode(sys.getfilesystemencoding()) )#.encode('utf-8')#.decode(sys.getfilesystemencoding())
+#out ( sys.argv[1].decode(sys.getfilesystemencoding()) )
 
 con = lite.connect ( sys.argv[1].decode(sys.getfilesystemencoding()) )
 
@@ -32,24 +32,23 @@ with con:
   #dt = datetime.strptime ( x[1], gctimeformat );
   dt = datetime.now()
   veryend = dt - timedelta(dt.weekday()) + timedelta(7)
-  print ( verystart, veryend );
+  #print ( verystart, veryend );
   
   # all expense accounts
-  cur.execute ( "select name, parent_guid, guid from accounts where account_type='EXPENSE' and placeholder=0" );
+  cur.execute ( "select name, parent_guid, a.guid, c.mnemonic from accounts a join commodities c on a.commodity_guid=c.guid where account_type='EXPENSE' and placeholder=0" );
   res = cur.fetchall()
-  #print ( [x[0].encode('utf-8') for x in res] )
   accs = []
   for x in res:
     name = []
     parent = x[1]
-    accguid = x[2]
+    acc = { 'guid': x[2], 'currency': x[3] }
     cparentacc = con.cursor()
     while parent != None:
       name.append ( x[0] )
       cparentacc.execute ( "select name, parent_guid from accounts where guid=?", (parent,) )
       x = cparentacc.fetchone()
       parent = x[1]
-    acc = { 'name': [i for i in reversed(name)], 'guid': accguid }
+    acc['name'] = [i for i in reversed(name)]
     #out ( ':'.join(acc['name']) )
     accs.append(acc)
     
@@ -59,7 +58,7 @@ with con:
   for acc in accs:
     weekst = verystart
     out ( ':'.join(acc['name']) )
-    print ( x )
+    out ( acc['currency'] )
     while weekst < veryend:
       weeklo = weekst
       weekst += timedelta(7)
