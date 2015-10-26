@@ -29,7 +29,8 @@ with con:
   #dt = datetime.strptime ( x[0], gctimeformat );
   dt = datetime.strptime ( '20150101000000', gctimeformat );
   verystart = dt - timedelta(dt.weekday())
-  dt = datetime.strptime ( x[1], gctimeformat );
+  #dt = datetime.strptime ( x[1], gctimeformat );
+  dt = datetime.now()
   veryend = dt - timedelta(dt.weekday()) + timedelta(7)
   print ( verystart, veryend );
   
@@ -49,7 +50,7 @@ with con:
       x = cparentacc.fetchone()
       parent = x[1]
     acc = { 'name': [i for i in reversed(name)], 'guid': accguid }
-    out ( ':'.join(acc['name']) ) #.encode('utf-8') )
+    #out ( ':'.join(acc['name']) )
     accs.append(acc)
     
   # now accs contains list of expense accounts we are interested in 
@@ -62,7 +63,7 @@ with con:
     print ( x )
     while weekst < veryend:
       weekst += timedelta(7)
-      cur.execute ( "select sum(cast(value_num as numeric(10,2))/100.0) from transactions t join splits s on s.tx_guid=t.guid "
+      cur.execute ( "select sum(cast(quantity_num as numeric(10,2))/100.0) from transactions t join splits s on s.tx_guid=t.guid "
         "where s.account_guid=? and t.post_date<? "
         "and reconcile_state in ('y','c','n')", (acc['guid'],weekst.strftime(gctimeformat)) )
       x = cur.fetchone()
