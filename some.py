@@ -3,7 +3,7 @@
 
 import sqlite3 as lite
 import sys
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 #import codecs
 #codecs.register(lambda name: codecs.lookup('utf-8') if name == 'cp65001' else None)
 
@@ -28,12 +28,14 @@ with con:
   cur.execute ( "select min(post_date), max(post_date) from transactions" );
   x = cur.fetchone();
   #dt = datetime.strptime ( x[0], gctimeformat );
-  dt = datetime.strptime ( '20150101000000', gctimeformat );
+  dt = datetime.strptime ( '20150101000000', gctimeformat ).date()
   verystart = dt - timedelta(dt.weekday())
   #dt = datetime.strptime ( x[1], gctimeformat );
-  dt = datetime.now()
-  veryend = dt - timedelta(dt.weekday()) + timedelta(7)
-  #print ( verystart, veryend );
+  dt = date.today()
+  budgetSince = dt - timedelta(dt.weekday())
+  dt = date.today()
+  veryend = dt - timedelta(dt.weekday()) + timedelta(7*4)
+  #print ( verystart, veryend, budgetSince );
   
   # all expense accounts
   cur.execute ( "select name, parent_guid, a.guid, c.mnemonic from accounts a join commodities c on a.commodity_guid=c.guid where account_type='EXPENSE' and placeholder=0" );
@@ -60,7 +62,17 @@ with con:
   out ( 'Currency' )
   weekst = verystart
   while weekst < veryend:
-    out ( weekst.date().isoformat() )
+    out ( weekst.isoformat() )
+    weekst += timedelta(7)
+  print
+  out ('')
+  out ('')
+  weekst = verystart
+  while weekst < veryend:
+    if weekst < budgetSince:
+      out ( 'fact' )
+    else:
+      out ( 'budget' )
     weekst += timedelta(7)
   print
     
