@@ -7,8 +7,9 @@ from datetime import datetime, timedelta
 #import codecs
 #codecs.register(lambda name: codecs.lookup('utf-8') if name == 'cp65001' else None)
 
-def out(unicodeobj): 
-  print unicodeobj.encode('utf-8')
+def out ( unicodeobj ): 
+  sys.stdout.write ( unicodeobj.encode('utf-8') )
+  sys.stdout.write ( '\t' )
 
 gctimeformat = '%Y%m%d%H%M%S'
   
@@ -54,6 +55,15 @@ with con:
     
   # now accs contains list of expense accounts we are interested in 
   
+  # print table header
+  out ( 'Account' )
+  out ( 'Currency' )
+  weekst = verystart
+  while weekst < veryend:
+    out ( weekst.date().isoformat() )
+    weekst += timedelta(7)
+  print
+    
   # get weekly history for every expense account
   for acc in accs:
     weekst = verystart
@@ -70,5 +80,6 @@ with con:
         newbalance = 0
       else:
         newbalance = x[0]
-      print weeklo, newbalance
+      out ( str(newbalance) )
+    print
       
