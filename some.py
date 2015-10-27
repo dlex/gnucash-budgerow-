@@ -81,6 +81,8 @@ with con:
     weekst = verystart
     out ( ':'.join(acc['name']) )
     out ( acc['currency'] )
+    bsum = 0
+    bcount = 0
     while weekst < veryend:
       weeklo = weekst
       weekst += timedelta(7)
@@ -89,9 +91,15 @@ with con:
         "and reconcile_state in ('y','c','n')", (acc['guid'],weeklo.strftime(gctimeformat),weekst.strftime(gctimeformat)) )
       x = cur.fetchone()
       if x[0] == None:
-        newbalance = 0
+        balance = 0
       else:
-        newbalance = x[0]
-      out ( str(newbalance) )
+        balance = x[0]
+        
+      if weeklo < budgetSince:
+        out ( str(balance) )
+        bsum += balance
+        bcount += 1
+      else:
+        bbalance = bsum / bcount + balance
+        out ( str(bbalance) )
     print
-      
