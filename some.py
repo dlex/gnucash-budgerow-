@@ -18,43 +18,43 @@ def plan ( con, accs, start, budgetSince, end, intervaler ):
   # print table header
   out ( 'Account' )
   out ( 'Currency' )
-  weekst = intervaler.findstart(start)
+  intv = intervaler.findstart(start)
   veryend = intervaler.findend(end)
-  while weekst < veryend:
-    out ( weekst.isoformat() )
-    weekst = intervaler.increment(weekst)
+  while intv < veryend:
+    out ( intv.isoformat() )
+    intv = intervaler.increment(intv)
   print
   out ('')
   out ('')
-  weekst = intervaler.findstart(start)
-  while weekst < veryend:
-    if weekst < budgetSince:
+  intv = intervaler.findstart(start)
+  while intv < veryend:
+    if intv < budgetSince:
       out ( 'fact' )
     else:
       out ( 'budget' )
-    weekst += timedelta(7)
+    intv = intervaler.increment(intv)
   print
 
   # get intervally history for every expense account
   for acc in accs:
-    weekst = intervaler.findstart(start)
+    intv = intervaler.findstart(start)
     out ( ':'.join(acc['name']) )
     out ( acc['currency'] )
     bsum = 0
     bcount = 0
-    while weekst < veryend:
-      weeklo = weekst
-      weekst = intervaler.increment(weekst)
+    while intv < veryend:
+      intprev = intv
+      intv = intervaler.increment(intv)
       cur.execute ( "select sum(cast(quantity_num as numeric(10,2))/100.0) from transactions t join splits s on s.tx_guid=t.guid "
         "where s.account_guid=? and t.post_date>=? and t.post_date<?"
-        "and reconcile_state in ('y','c','n')", (acc['guid'],weeklo.strftime(gctimeformat),weekst.strftime(gctimeformat)) )
+        "and reconcile_state in ('y','c','n')", (acc['guid'],intprev.strftime(gctimeformat),intv.strftime(gctimeformat)) )
       x = cur.fetchone()
       if x[0] == None:
         balance = 0
       else:
         balance = x[0]
         
-      if weeklo < budgetSince:
+      if intprev < budgetSince:
         out ( str(balance) )
         bsum += balance
         bcount += 1
@@ -70,6 +70,18 @@ class ivlWeekly:
     return dt - timedelta(dt.weekday()) + timedelta(7)
   def increment(self,dt):
     return dt + timedelta(7)
+    
+class ivlMonthly:
+  def findstart(self,dt):
+    return dt - timedelta(dt.day-1)
+  def findend(self,dt):
+    return self.increment ( self.findstart(dt) )
+  def increment(self,dt):
+    if dt.month == 12:
+      return date ( dt.year+1, 1, dt.day )
+    else:
+      return date ( dt.year, dt.month+1, dt.day )
+  
 #print sys.getdefaultencoding()
 #print sys.getfilesystemencoding()
 #print "Encoding is", sys.stdout.encoding
@@ -113,5 +125,11 @@ with con:
     
   # now accs contains list of expense accounts we are interested in 
   
+  print "WEEKLY BUDGET"
   iv = ivlWeekly()
   plan ( con, accs, start, budgetSince, end, iv )
+
+  print "MONTHLY BUDGET"
+  iv = ivlMonthly()
+  plan ( con, accs, start, budgetSince, end, iv )
+  
