@@ -83,8 +83,9 @@ def history ( acc, start, budgetSince, end, intervaler, currency ):
       bsum += balance
       bcount += 1
     else:
-      bbalance = bsum / bcount + balance
+      bbalance = bsum / bcount
       out ( str(bbalance) )
+      out ( str(bbalance-balance) )
 
       
 def plan ( accs, start, budgetSince, end, intervaler ):
@@ -106,6 +107,7 @@ def plan ( accs, start, budgetSince, end, intervaler ):
       out ( 'fact' )
     else:
       out ( 'budget' )
+      out ( 'left' )
     intv = intervaler.increment(intv)
   outln ()
 
