@@ -4,6 +4,7 @@
 import sqlite3 as lite
 import sys
 from datetime import date, datetime, timedelta
+from statistics import median
 
 gctimeformat = '%Y%m%d%H%M%S'
 utf8stdout = open(1, 'w', encoding='utf-8', closefd=False) # fd 1 is stdout
@@ -15,8 +16,50 @@ def outln ():
   print ( '', file=utf8stdout )
 
 
-def history ( acc, start, budgetSince, end, intervaler ):
+def getConvrateForDate ( curfrom, curto, date ):
+  if curfrom == curto:
+    return 1
+  cur = con.cursor()
+  cur.execute ( '''
+select p.value_num, p.value_denom
+	from prices p
+	join commodities co on p.commodity_guid=co.guid
+	join commodities cu on p.currency_guid=cu.guid
+	where type='last' and co.mnemonic=:curfrom and cu.mnemonic=:curto
+	order by abs(p.date-:date) limit 1''',
+    {'curfrom': curfrom, 'curto': curto, 'date': date.strftime(gctimeformat) } )
+  res = cur.fetchone()
+  return res[0]/res[1]
+  
+def getConvrateForPeriod ( curfrom, curto, perstart, perend ):
+  if curfrom == curto:
+    return 1
+  cur = con.cursor()
+  cur.execute ( '''
+select p.value_num, p.value_denom
+	from prices p
+	join commodities co on p.commodity_guid=co.guid
+	join commodities cu on p.currency_guid=cu.guid
+	where type='last' and date between :perstart and :perend
+		and co.mnemonic=:curfrom and cu.mnemonic=:curto
+union all
+select p.value_denom, p.value_num
+	from prices p
+	join commodities co on p.commodity_guid=co.guid
+	join commodities cu on p.currency_guid=cu.guid
+	where type='last' and date between :perstart and :perend
+		and co.mnemonic=:curto and cu.mnemonic=:curfrom''', 
+    {'curfrom': curfrom, 'curto': curto, 'perstart': perstart.strftime(gctimeformat), 'perend': perend.strftime(gctimeformat) } )
+  res = cur.fetchall()
+  #out ( "%s %s %s" % (repr(perstart), repr(perend), repr(res)) )
+  if len(res)==0:
+    return ( getConvrateForDate(curfrom,curto,perstart) + getConvrateForDate(curfrom,curto,perend) ) / 2
+  else:
+    return median ( [x[0]/x[1] for x in res] )
+
+def history ( acc, start, budgetSince, end, intervaler, currency ):
     
+  cur = con.cursor()
   intv = intervaler.findstart(start)
   bsum = 0
   bcount = 0
@@ -32,6 +75,8 @@ def history ( acc, start, budgetSince, end, intervaler ):
       balance = 0
     else:
       balance = x[0]
+      
+    balance *= getConvrateForPeriod ( acc['currency'], currency, intprev, intv )
     
     if intprev < budgetSince:
       out ( str(balance) )
@@ -42,7 +87,7 @@ def history ( acc, start, budgetSince, end, intervaler ):
       out ( str(bbalance) )
 
       
-def plan ( con, accs, start, budgetSince, end, intervaler ):
+def plan ( accs, start, budgetSince, end, intervaler ):
 
   # print table header
   out ( 'Account' )
@@ -68,13 +113,13 @@ def plan ( con, accs, start, budgetSince, end, intervaler ):
   for acc in accs:
     out ( ':'.join(acc['name']) )
     out ( acc['currency'] )
-    history ( acc, start, budgetSince, end, intervaler )
+    history ( acc, start, budgetSince, end, intervaler, acc['currency'] )
     outln ()
     
     if acc['currency'] != 'CAD':
       out ( ':'.join(acc['name']) )
       out ( 'CAD' )
-      history ( acc, start, budgetSince, end, intervaler )
+      history ( acc, start, budgetSince, end, intervaler, 'CAD' )
       outln ()
 
 class ivlWeekly:
@@ -121,6 +166,7 @@ con = lite.connect ( sys.argv[1] ) #.decode(sys.getfilesystemencoding()) )
 
 with con:
   
+  cur = con.cursor()
   # time range
   cur.execute ( "select min(post_date), max(post_date) from transactions" );
   x = cur.fetchone();
@@ -138,7 +184,7 @@ with con:
   res = cur.fetchall()
   accs = []
   for x in res:
-    out ( [type(x[0]), type(x[1]), type(x[3])] )
+    #out ( [type(x[0]), type(x[1]), type(x[3])] )
     name = []
     parent = x[1]
     acc = { 'guid': x[2], 'currency': x[3] }
@@ -157,15 +203,15 @@ with con:
   out ( "WEEKLY BUDGET" )
   outln ()
   iv = ivlWeekly()
-  plan ( con, accs, start, budgetSince, end, iv )
+  plan ( accs, start, budgetSince, end, iv )
 
   out ( "SEMIMONTHLY BUDGET" )
   outln ()
   iv = ivlSemimonthly()
-  plan ( con, accs, start, budgetSince, end, iv )
+  plan ( accs, start, budgetSince, end, iv )
   
   out ( "MONTHLY BUDGET" )
   outln ()
   iv = ivlMonthly()
-  plan ( con, accs, start, budgetSince, end, iv )
+  plan ( accs, start, budgetSince, end, iv )
   
