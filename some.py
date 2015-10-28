@@ -70,7 +70,23 @@ class ivlWeekly:
     return dt - timedelta(dt.weekday()) + timedelta(7)
   def increment(self,dt):
     return dt + timedelta(7)
-    
+
+class ivlSemimonthly:
+  def findstart(self,dt):
+    if dt.day < 16:
+      return dt - timedelta(dt.day-1)
+    else:
+      return dt - timedelta(dt.day-16)
+  def findend(self,dt):
+    return self.increment ( self.findstart(dt) )
+  def increment(self,dt):
+    if dt.day < 16:
+      return date ( dt.year, dt.month, dt.day+15 )
+    if dt.month == 12:
+      return date ( dt.year+1, 1, dt.day-15 )
+    else:
+      return date ( dt.year, dt.month+1, dt.day-15 )
+
 class ivlMonthly:
   def findstart(self,dt):
     return dt - timedelta(dt.day-1)
@@ -129,6 +145,10 @@ with con:
   iv = ivlWeekly()
   plan ( con, accs, start, budgetSince, end, iv )
 
+  print "SEMIMONTHLY BUDGET"
+  iv = ivlSemimonthly()
+  plan ( con, accs, start, budgetSince, end, iv )
+  
   print "MONTHLY BUDGET"
   iv = ivlMonthly()
   plan ( con, accs, start, budgetSince, end, iv )
