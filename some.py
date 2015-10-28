@@ -13,6 +13,33 @@ def out ( unicodeobj ):
   sys.stdout.write ( unicodeobj.encode('utf-8') )
   sys.stdout.write ( '\t' )
 
+def history ( acc, start, budgetSince, end, intervaler ):
+    
+  intv = intervaler.findstart(start)
+  bsum = 0
+  bcount = 0
+  veryend = intervaler.findend(end)
+  while intv < veryend:
+    intprev = intv
+    intv = intervaler.increment(intv)
+    cur.execute ( "select sum(cast(quantity_num as numeric(10,2))/100.0) from transactions t join splits s on s.tx_guid=t.guid "
+      "where s.account_guid=? and t.post_date>=? and t.post_date<?"
+      "and reconcile_state in ('y','c','n')", (acc['guid'],intprev.strftime(gctimeformat),intv.strftime(gctimeformat)) )
+    x = cur.fetchone()
+    if x[0] == None:
+      balance = 0
+    else:
+      balance = x[0]
+    
+    if intprev < budgetSince:
+      out ( str(balance) )
+      bsum += balance
+      bcount += 1
+    else:
+      bbalance = bsum / bcount + balance
+      out ( str(bbalance) )
+
+      
 def plan ( con, accs, start, budgetSince, end, intervaler ):
 
   # print table header
@@ -40,28 +67,11 @@ def plan ( con, accs, start, budgetSince, end, intervaler ):
     intv = intervaler.findstart(start)
     out ( ':'.join(acc['name']) )
     out ( acc['currency'] )
-    bsum = 0
-    bcount = 0
-    while intv < veryend:
-      intprev = intv
-      intv = intervaler.increment(intv)
-      cur.execute ( "select sum(cast(quantity_num as numeric(10,2))/100.0) from transactions t join splits s on s.tx_guid=t.guid "
-        "where s.account_guid=? and t.post_date>=? and t.post_date<?"
-        "and reconcile_state in ('y','c','n')", (acc['guid'],intprev.strftime(gctimeformat),intv.strftime(gctimeformat)) )
-      x = cur.fetchone()
-      if x[0] == None:
-        balance = 0
-      else:
-        balance = x[0]
-        
-      if intprev < budgetSince:
-        out ( str(balance) )
-        bsum += balance
-        bcount += 1
-      else:
-        bbalance = bsum / bcount + balance
-        out ( str(bbalance) )
-    print
+    history ( acc, start, budgetSince, end, intervaler )
+    if acc['currency'] != 'CAD':
+      out ( ':'.join(acc['name']) )
+      out ( 'CAD' )
+      history ( acc, start, budgetSince, end, intervaler )
 
 class ivlWeekly:
   def findstart(self,dt):
