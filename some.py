@@ -1,17 +1,19 @@
-﻿#!/usr/bin/python
+﻿#! python3
 # -*- coding: utf-8 -*-
 
 import sqlite3 as lite
 import sys
 from datetime import date, datetime, timedelta
-#import codecs
-#codecs.register(lambda name: codecs.lookup('utf-8') if name == 'cp65001' else None)
 
 gctimeformat = '%Y%m%d%H%M%S'
+utf8stdout = open(1, 'w', encoding='utf-8', closefd=False) # fd 1 is stdout
 
-def out ( unicodeobj ): 
-  sys.stdout.write ( unicodeobj.encode('utf-8') )
-  sys.stdout.write ( '\t' )
+def out ( str ): 
+  print ( str, file=utf8stdout, end='\t' )
+  
+def outln ():
+  print ( '', file=utf8stdout )
+
 
 def history ( acc, start, budgetSince, end, intervaler ):
     
@@ -50,7 +52,7 @@ def plan ( con, accs, start, budgetSince, end, intervaler ):
   while intv < veryend:
     out ( intv.isoformat() )
     intv = intervaler.increment(intv)
-  print
+  outln ()
   out ('')
   out ('')
   intv = intervaler.findstart(start)
@@ -60,18 +62,20 @@ def plan ( con, accs, start, budgetSince, end, intervaler ):
     else:
       out ( 'budget' )
     intv = intervaler.increment(intv)
-  print
+  outln ()
 
-  # get intervally history for every expense account
+  # get interval history for every expense account
   for acc in accs:
-    intv = intervaler.findstart(start)
     out ( ':'.join(acc['name']) )
     out ( acc['currency'] )
     history ( acc, start, budgetSince, end, intervaler )
+    outln ()
+    
     if acc['currency'] != 'CAD':
       out ( ':'.join(acc['name']) )
       out ( 'CAD' )
       history ( acc, start, budgetSince, end, intervaler )
+      outln ()
 
 class ivlWeekly:
   def findstart(self,dt):
@@ -108,16 +112,14 @@ class ivlMonthly:
     else:
       return date ( dt.year, dt.month+1, dt.day )
   
-#print sys.getdefaultencoding()
-#print sys.getfilesystemencoding()
-#print "Encoding is", sys.stdout.encoding
-#out ( sys.argv[1].decode(sys.getfilesystemencoding()) )
+#print ( sys.getdefaultencoding() )
+#print ( sys.getfilesystemencoding() )
+#print ( "Encoding is", sys.stdout.encoding )
+#out ( sys.argv[1] )#.decode(sys.getfilesystemencoding()) )
 
-con = lite.connect ( sys.argv[1].decode(sys.getfilesystemencoding()) )
+con = lite.connect ( sys.argv[1] ) #.decode(sys.getfilesystemencoding()) )
 
 with con:
-  
-  cur = con.cursor()
   
   # time range
   cur.execute ( "select min(post_date), max(post_date) from transactions" );
@@ -136,6 +138,7 @@ with con:
   res = cur.fetchall()
   accs = []
   for x in res:
+    out ( [type(x[0]), type(x[1]), type(x[3])] )
     name = []
     parent = x[1]
     acc = { 'guid': x[2], 'currency': x[3] }
@@ -151,15 +154,18 @@ with con:
     
   # now accs contains list of expense accounts we are interested in 
   
-  print "WEEKLY BUDGET"
+  out ( "WEEKLY BUDGET" )
+  outln ()
   iv = ivlWeekly()
   plan ( con, accs, start, budgetSince, end, iv )
 
-  print "SEMIMONTHLY BUDGET"
+  out ( "SEMIMONTHLY BUDGET" )
+  outln ()
   iv = ivlSemimonthly()
   plan ( con, accs, start, budgetSince, end, iv )
   
-  print "MONTHLY BUDGET"
+  out ( "MONTHLY BUDGET" )
+  outln ()
   iv = ivlMonthly()
   plan ( con, accs, start, budgetSince, end, iv )
   
