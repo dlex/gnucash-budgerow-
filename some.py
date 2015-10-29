@@ -67,9 +67,10 @@ def history ( acc, start, budgetSince, end, intervaler, currency ):
   while intv < veryend:
     intprev = intv
     intv = intervaler.increment(intv)
-    cur.execute ( "select sum(cast(quantity_num as numeric(10,2))/100.0) from transactions t join splits s on s.tx_guid=t.guid "
-      "where s.account_guid=? and t.post_date>=? and t.post_date<?"
-      "and reconcile_state in ('y','c','n')", (acc['guid'],intprev.strftime(gctimeformat),intv.strftime(gctimeformat)) )
+    cur.execute ( '''
+select sum(cast(quantity_num as numeric(10,2))/100.0) from transactions t join splits s on s.tx_guid=t.guid 
+  where s.account_guid=? and t.post_date>=? and t.post_date<?
+    and reconcile_state in ('y','c','n')''', (acc['guid'],intprev.strftime(gctimeformat),intv.strftime(gctimeformat)) )
     x = cur.fetchone()
     if x[0] == None:
       balance = 0
@@ -207,7 +208,11 @@ with con:
   #print ( verystart, veryend, budgetSince );
   
   # all expense accounts
-  cur.execute ( "select name, parent_guid, a.guid, c.mnemonic from accounts a join commodities c on a.commodity_guid=c.guid where account_type='EXPENSE' and placeholder=0" );
+  cur.execute ( '''
+select name, parent_guid, a.guid, c.mnemonic 
+  from accounts a 
+    join commodities c on a.commodity_guid=c.guid 
+  where (account_type='EXPENSE' or account_type='INCOME') and placeholder=0''' );
   res = cur.fetchall()
   accs = []
   for x in res:
