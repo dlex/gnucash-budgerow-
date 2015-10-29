@@ -4,7 +4,7 @@
 import sqlite3 as lite
 import sys
 from datetime import date, datetime, timedelta
-from statistics import median
+import statistics as stats
 
 gctimeformat = '%Y%m%d%H%M%S'
 utf8stdout = open(1, 'w', encoding='utf-8', closefd=False) # fd 1 is stdout
@@ -55,7 +55,7 @@ select p.value_denom, p.value_num
   if len(res)==0:
     return ( getConvrateForDate(curfrom,curto,perstart) + getConvrateForDate(curfrom,curto,perend) ) / 2
   else:
-    return median ( [x[0]/x[1] for x in res] )
+    return stats.median ( [x[0]/x[1] for x in res] )
 
 def history ( acc, start, budgetSince, end, intervaler, currency ):
     
@@ -78,11 +78,13 @@ def history ( acc, start, budgetSince, end, intervaler, currency ):
       
     balance *= getConvrateForPeriod ( acc['currency'], currency, intprev, intv )
     
-    if intprev < budgetSince:
-      out ( str(balance) )
+    if intprev < intervaler.findstart(budgetSince):
+      #out ( str(balance) )
+      acc['history'].append(balance)
       bsum += balance
       bcount += 1
     else:
+      acc['future'][intprev] = balance
       bbalance = bsum / bcount
       out ( str(bbalance) )
       out ( str(bbalance-balance) )
@@ -93,9 +95,10 @@ def plan ( accs, start, budgetSince, end, intervaler ):
   # print table header
   out ( 'Account' )
   out ( 'Currency' )
-  intv = intervaler.findstart(start)
+  intv = intervaler.findstart(budgetSince)
   veryend = intervaler.findend(end)
   while intv < veryend:
+    out ( intv.isoformat() )
     out ( intv.isoformat() )
     intv = intervaler.increment(intv)
   outln ()
@@ -104,7 +107,8 @@ def plan ( accs, start, budgetSince, end, intervaler ):
   intv = intervaler.findstart(start)
   while intv < veryend:
     if intv < budgetSince:
-      out ( 'fact' )
+      #out ( 'fact' )
+      pass
     else:
       out ( 'budget' )
       out ( 'left' )
@@ -113,16 +117,37 @@ def plan ( accs, start, budgetSince, end, intervaler ):
 
   # get interval history for every expense account
   for acc in accs:
+    acc['history'] = []
+    acc['future'] = {}
     out ( ':'.join(acc['name']) )
     out ( acc['currency'] )
     history ( acc, start, budgetSince, end, intervaler, acc['currency'] )
+    #out ( repr(acc['future']) )
     outln ()
     
-    if acc['currency'] != 'CAD':
-      out ( ':'.join(acc['name']) )
-      out ( 'CAD' )
-      history ( acc, start, budgetSince, end, intervaler, 'CAD' )
-      outln ()
+    #if acc['currency'] != 'CAD':
+    #  out ( ':'.join(acc['name']) )
+    #  out ( 'CAD' )
+    #  #history ( acc, start, budgetSince, end, intervaler, 'CAD' )
+    #  outln ()
+    
+  # budgets ahead
+  out ( 'Total' )
+  out ( 'CAD' )
+  intv = intervaler.findstart(budgetSince)
+  veryend = intervaler.findend(end)
+  while intv < veryend:
+    intprev = intv
+    intv = intervaler.increment(intv)
+    totalb = 0
+    totals = 0
+    for acc in accs:
+      convrate = getConvrateForPeriod ( acc['currency'], 'CAD', intprev, intv )
+      totalb += stats.mean(acc['history']) * convrate
+      totals += acc['future'][intprev] * convrate
+    out ( repr(totalb) )
+    out ( repr(totals) )
+  outln ()
 
 class ivlWeekly:
   def findstart(self,dt):
@@ -189,7 +214,7 @@ with con:
     #out ( [type(x[0]), type(x[1]), type(x[3])] )
     name = []
     parent = x[1]
-    acc = { 'guid': x[2], 'currency': x[3] }
+    acc = { 'guid': x[2], 'currency': x[3], 'history': [], 'future': {} }
     cparentacc = con.cursor()
     while parent != None:
       name.append ( x[0] )
