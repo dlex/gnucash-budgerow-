@@ -240,7 +240,8 @@ select name, parent_guid, a.guid, c.mnemonic, coalesce(ba.participation,1)
     acc['name'] = [i for i in reversed(name)]
     #out ( ':'.join(acc['name']) )
     accs.append(acc)
-    
+  accs.sort ( key=lambda acc: acc['name'] )  
+  
   # now accs contains list of expense accounts we are interested in 
   
   out ( "WEEKLY BUDGET" )
