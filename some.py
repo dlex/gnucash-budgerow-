@@ -85,8 +85,10 @@ select sum(cast(quantity_num as numeric(10,2))/100.0) from transactions t join s
       bsum += balance
       bcount += 1
     else:
-      acc['future'][intprev] = balance
       bbalance = bsum / bcount
+      if acc['partic'] == 0:
+        bbalance = balance
+      acc['future'][intprev] = balance
       out ( str(bbalance) )
       out ( str(bbalance-balance) )
 
@@ -95,6 +97,7 @@ def plan ( accs, start, budgetSince, end, intervaler ):
 
   # print table header
   out ( 'Account' )
+  out ( 'Participation' )
   out ( 'Currency' )
   intv = intervaler.findstart(budgetSince)
   veryend = intervaler.findend(end)
@@ -103,6 +106,7 @@ def plan ( accs, start, budgetSince, end, intervaler ):
     out ( intv.isoformat() )
     intv = intervaler.increment(intv)
   outln ()
+  out ('')
   out ('')
   out ('')
   intv = intervaler.findstart(start)
@@ -121,6 +125,7 @@ def plan ( accs, start, budgetSince, end, intervaler ):
     acc['history'] = []
     acc['future'] = {}
     out ( ':'.join(acc['name']) )
+    out ( acc['partic'] )
     out ( acc['currency'] )
     history ( acc, start, budgetSince, end, intervaler, acc['currency'] )
     #out ( repr(acc['future']) )
@@ -134,6 +139,7 @@ def plan ( accs, start, budgetSince, end, intervaler ):
     
   # budgets ahead
   out ( 'Total' )
+  out ( '' )
   out ( 'CAD' )
   intv = intervaler.findstart(budgetSince)
   veryend = intervaler.findend(end)
@@ -144,8 +150,12 @@ def plan ( accs, start, budgetSince, end, intervaler ):
     totals = 0
     for acc in accs:
       convrate = getConvrateForPeriod ( acc['currency'], 'CAD', intprev, intv )
-      totalb += stats.mean(acc['history']) * convrate
-      totals += acc['future'][intprev] * convrate
+      accfuture = acc['future'][intprev] * convrate 
+      if acc['partic'] == 0:
+        totals += accfuture
+      else:
+        totalb += stats.mean(acc['history']) * convrate
+      totals += accfuture
     out ( repr(totalb) )
     out ( repr(totals) )
   outln ()
@@ -209,9 +219,10 @@ with con:
   
   # all expense accounts
   cur.execute ( '''
-select name, parent_guid, a.guid, c.mnemonic 
+select name, parent_guid, a.guid, c.mnemonic, coalesce(ba.participation,1)
   from accounts a 
     join commodities c on a.commodity_guid=c.guid 
+    left outer join bw_accounts ba on ba.guid=a.guid
   where (account_type='EXPENSE' or account_type='INCOME') and placeholder=0''' );
   res = cur.fetchall()
   accs = []
@@ -219,7 +230,7 @@ select name, parent_guid, a.guid, c.mnemonic
     #out ( [type(x[0]), type(x[1]), type(x[3])] )
     name = []
     parent = x[1]
-    acc = { 'guid': x[2], 'currency': x[3], 'history': [], 'future': {} }
+    acc = { 'guid': x[2], 'currency': x[3], 'partic': x[4], 'history': [], 'future': {} }
     cparentacc = con.cursor()
     while parent != None:
       name.append ( x[0] )
