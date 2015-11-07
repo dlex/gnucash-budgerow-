@@ -57,10 +57,11 @@ select p.value_denom, p.value_num
   else:
     return stats.median ( [x[0]/x[1] for x in res] )
 
+    
 def history ( acc, start, budgetSince, end, intervaler, currency ):
     
   cur = con.cursor()
-  intv = intervaler.findstart(start)
+  intv = intervaler.findstart ( max(start,acc['hstart']) )
   bsum = 0
   bcount = 0
   veryend = intervaler.findend(end)
@@ -150,6 +151,7 @@ def plan ( accs, start, budgetSince, end, intervaler ):
     totals = 0
     for acc in accs:
       convrate = getConvrateForPeriod ( acc['currency'], 'CAD', intprev, intv )
+      #out ( "%s %s" % (acc['name'], acc['future']) )
       accfuture = acc['future'][intprev] * convrate 
       if acc['partic'] == 0:
         totals += accfuture
@@ -217,9 +219,9 @@ with con:
   end = dt + timedelta(30)
   #print ( verystart, veryend, budgetSince );
   
-  # all expense accounts
+  # all I/E accounts
   cur.execute ( '''
-select name, parent_guid, a.guid, c.mnemonic, coalesce(ba.participation,1)
+select name, parent_guid, a.guid, c.mnemonic, coalesce(ba.participation,1), ba.history_start
   from accounts a 
     join commodities c on a.commodity_guid=c.guid 
     left outer join bw_accounts ba on ba.guid=a.guid
@@ -230,14 +232,22 @@ select name, parent_guid, a.guid, c.mnemonic, coalesce(ba.participation,1)
     #out ( [type(x[0]), type(x[1]), type(x[3])] )
     name = []
     parent = x[1]
-    acc = { 'guid': x[2], 'currency': x[3], 'partic': x[4], 'history': [], 'future': {} }
+    acc = { 'guid': x[2], 'currency': x[3], 'partic': x[4], 'hstart': x[5], 'history': [], 'future': {} }
     cparentacc = con.cursor()
     while parent != None:
       name.append ( x[0] )
-      cparentacc.execute ( "select name, parent_guid from accounts where guid=?", (parent,) )
+      cparentacc.execute ( '''
+select name, parent_guid, ba.history_start
+  from accounts a
+    left outer join bw_accounts ba on ba.guid=a.guid
+  where a.guid=?''', (parent,) )
       x = cparentacc.fetchone()
       parent = x[1]
+      if acc['hstart'] == None:
+        acc['hstart'] = x[2]
     acc['name'] = [i for i in reversed(name)]
+    if acc['hstart'] != None:
+      acc['hstart'] = datetime.strptime ( acc['hstart'], gctimeformat ).date()
     #out ( ':'.join(acc['name']) )
     accs.append(acc)
   accs.sort ( key=lambda acc: acc['name'] )  
