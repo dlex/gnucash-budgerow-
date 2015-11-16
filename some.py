@@ -254,18 +254,33 @@ select name, parent_guid, ba.history_start
   
   # now accs contains list of expense accounts we are interested in 
   
-  out ( "WEEKLY BUDGET" )
-  outln ()
-  iv = ivlWeekly()
-  plan ( accs, start, budgetSince, end, iv )
-
-  out ( "SEMIMONTHLY BUDGET" )
-  outln ()
-  iv = ivlSemimonthly()
-  plan ( accs, start, budgetSince, end, iv )
-  
   out ( "MONTHLY BUDGET" )
   outln ()
   iv = ivlMonthly()
   plan ( accs, start, budgetSince, end, iv )
   
+  out ( "SEMIMONTHLY BUDGET" )
+  outln ()
+  iv = ivlSemimonthly()
+  plan ( accs, start, budgetSince, end, iv )
+  
+  out ( "WEEKLY BUDGET" )
+  outln ()
+  iv = ivlWeekly()
+  plan ( accs, start, budgetSince, end, iv )
+
+
+# Budgeting plan
+# CFD(h,x) - discrete distribution function built of discrete historical samples of an account 'h'.
+# 'x' is the amount of profit/loss in the interval
+# EX: samples are: h = [33, 36, 38, 44]
+#   CFD(h,32) = 0
+#   CFD(h,33) = 0.25
+#   CFD(h,35.9) = 0.25
+#   CFD(h,36) = 0.5, etc
+# CFDa(h,x,w) - averaged distribution function
+# 'w' - running average width, can be taken as (max(h)-min(h))/2
+# CFDa(h,x,w) = INT ( CFDr(h,i)/w, i= x-w .. x+w )
+# C(h,x,w,r) - response adjusted distribution
+# 'r' - correction response rate of the account, [0..1], 1 - full response, 0 - no response
+# C(h,x,w,r) = ( CFDa(h,x,w) - CFDa(h,0.5,w) )*r + CFDa(h,0.5,w) = CFDa(h,x,w)*r + CFDa(h,0.5,w)*(1-r)
