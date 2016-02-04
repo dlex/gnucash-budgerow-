@@ -58,15 +58,20 @@ select p.value_denom, p.value_num
     return stats.median ( [x[0]/x[1] for x in res] )
 
     
-def history ( acc, start, budgetSince, end, intervaler, currency ):
+def history ( acc, start, budgetSince, end, intervaler, currency, printfact ):
     
   cur = con.cursor()
-  intv = intervaler.findstart ( max(start,acc['hstart']) )
+  intv = intervaler.findstart ( start )
   bsum = 0
   bcount = 0
   veryend = intervaler.findend(end)
   while intv < veryend:
     intvNext = intervaler.increment(intv)
+    if intv < acc['hstart']:
+      if printfact:
+        out ( '' )
+      intv = intvNext
+      continue
     cur.execute ( '''
 select sum(cast(quantity_num as numeric(10,2))/100.0) from transactions t join splits s on s.tx_guid=t.guid 
   where s.account_guid=? and t.post_date>=? and t.post_date<?
@@ -79,8 +84,9 @@ select sum(cast(quantity_num as numeric(10,2))/100.0) from transactions t join s
       
     balance *= getConvrateForPeriod ( acc['currency'], currency, intv, intvNext )
     
-      #out ( str(balance) )
     if intv < intervaler.findstart(budgetSince):
+      if printfact:
+        out ( str(balance) )
       acc['history'].append(balance)
       bsum += balance
       bcount += 1
@@ -95,7 +101,7 @@ select sum(cast(quantity_num as numeric(10,2))/100.0) from transactions t join s
     intv = intvNext
 
       
-def plan ( accs, start, budgetSince, end, intervaler ):
+def plan ( accs, start, budgetSince, end, intervaler, printfact ):
 
   # print table header
   out ( 'Account' )
@@ -104,8 +110,12 @@ def plan ( accs, start, budgetSince, end, intervaler ):
   intv = intervaler.findstart(start)
   veryend = intervaler.findend(end)
   while intv < veryend:
-    out ( intv.isoformat() )
-    out ( intv.isoformat() )
+    if intv < budgetSince:
+      if printfact:
+        out ( intv.isoformat() )
+    else:
+      out ( intv.isoformat() )
+      out ( intv.isoformat() )
     intv = intervaler.increment(intv)
   outln ()
   out ('')
@@ -114,8 +124,8 @@ def plan ( accs, start, budgetSince, end, intervaler ):
   intv = intervaler.findstart(start)
   while intv < veryend:
     if intv < budgetSince:
-      #out ( 'fact' )
-      pass
+      if printfact:
+        out ( 'fact' )
     else:
       out ( 'budget' )
       out ( 'left' )
@@ -129,7 +139,7 @@ def plan ( accs, start, budgetSince, end, intervaler ):
     out ( ':'.join(acc['name']) )
     out ( acc['partic'] )
     out ( acc['currency'] )
-    history ( acc, start, budgetSince, end, intervaler, acc['currency'] )
+    history ( acc, start, budgetSince, end, intervaler, acc['currency'], printfact )
     #out ( repr(acc['future']) )
     outln ()
     
@@ -143,23 +153,27 @@ def plan ( accs, start, budgetSince, end, intervaler ):
   out ( 'Total' )
   out ( '' )
   out ( 'CAD' )
-  intv = intervaler.findstart(budgetSince)
+  intv = intervaler.findstart(start)
   veryend = intervaler.findend(end)
   while intv < veryend:
     intvNext = intervaler.increment(intv)
     totalb = 0
     totals = 0
-    for acc in accs:
-      convrate = getConvrateForPeriod ( acc['currency'], 'CAD', intprev, intv )
-      #out ( "%s %s" % (acc['name'], acc['future']) )
-      accfuture = acc['future'][intprev] * convrate 
-      if acc['partic'] == 0:
+    if intv < budgetSince:
+      if printfact:
+        out ( '' )
+    else:
+      for acc in accs:
+        convrate = getConvrateForPeriod ( acc['currency'], 'CAD', intv, intvNext )
+        #out ( "%s %s" % (acc['name'], acc['future']) )
+        accfuture = acc['future'][intv] * convrate 
+        if acc['partic'] == 0:
+          totals += accfuture
+        else:
+          totalb += stats.mean(acc['history']) * convrate
         totals += accfuture
-      else:
-        totalb += stats.mean(acc['history']) * convrate
-      totals += accfuture
-    out ( repr(totalb) )
-    out ( repr(totals) )
+      out ( repr(totalb) )
+      out ( repr(totals) )
     intv = intvNext
   outln ()
 
@@ -218,7 +232,7 @@ with con:
   budgetSince = dt - timedelta(dt.weekday())
   dt = date.today()
   end = dt + timedelta(30)
-  #print ( verystart, veryend, budgetSince );
+  #out ( [start, end, budgetSince] );
   
   # all I/E accounts
   cur.execute ( '''
@@ -258,17 +272,17 @@ select name, parent_guid, ba.history_start
   out ( "MONTHLY BUDGET" )
   outln ()
   iv = ivlMonthly()
-  plan ( accs, start, budgetSince, end, iv )
+  plan ( accs, start, budgetSince, end, iv, 1 )
   
   out ( "SEMIMONTHLY BUDGET" )
   outln ()
   iv = ivlSemimonthly()
-  plan ( accs, start, budgetSince, end, iv )
+  plan ( accs, start, budgetSince, end, iv, 1 )
   
   out ( "WEEKLY BUDGET" )
   outln ()
   iv = ivlWeekly()
-  plan ( accs, start, budgetSince, end, iv )
+  plan ( accs, start, budgetSince, end, iv, 0 )
 
 
 # Budgeting plan
@@ -285,3 +299,4 @@ select name, parent_guid, ba.history_start
 # C(h,x,w,r) - response adjusted distribution
 # 'r' - correction response rate of the account, [0..1], 1 - full response, 0 - no response
 # C(h,x,w,r) = ( CFDa(h,x,w) - CFDa(h,0.5,w) )*r + CFDa(h,0.5,w) = CFDa(h,x,w)*r + CFDa(h,0.5,w)*(1-r)
+
