@@ -66,22 +66,21 @@ def history ( acc, start, budgetSince, end, intervaler, currency ):
   bcount = 0
   veryend = intervaler.findend(end)
   while intv < veryend:
-    intprev = intv
-    intv = intervaler.increment(intv)
+    intvNext = intervaler.increment(intv)
     cur.execute ( '''
 select sum(cast(quantity_num as numeric(10,2))/100.0) from transactions t join splits s on s.tx_guid=t.guid 
   where s.account_guid=? and t.post_date>=? and t.post_date<?
-    and reconcile_state in ('y','c','n')''', (acc['guid'],intprev.strftime(gctimeformat),intv.strftime(gctimeformat)) )
+    and reconcile_state in ('y','c','n')''', (acc['guid'],intv.strftime(gctimeformat),intvNext.strftime(gctimeformat)) )
     x = cur.fetchone()
     if x[0] == None:
       balance = 0
     else:
       balance = x[0]
       
-    balance *= getConvrateForPeriod ( acc['currency'], currency, intprev, intv )
+    balance *= getConvrateForPeriod ( acc['currency'], currency, intv, intvNext )
     
-    if intprev < intervaler.findstart(budgetSince):
       #out ( str(balance) )
+    if intv < intervaler.findstart(budgetSince):
       acc['history'].append(balance)
       bsum += balance
       bcount += 1
@@ -89,9 +88,11 @@ select sum(cast(quantity_num as numeric(10,2))/100.0) from transactions t join s
       bbalance = bsum / bcount
       if acc['partic'] == 0:
         bbalance = balance
-      acc['future'][intprev] = balance
+      acc['future'][intv] = balance
       out ( str(bbalance) )
       out ( str(bbalance-balance) )
+      
+    intv = intvNext
 
       
 def plan ( accs, start, budgetSince, end, intervaler ):
@@ -100,7 +101,7 @@ def plan ( accs, start, budgetSince, end, intervaler ):
   out ( 'Account' )
   out ( 'Participation' )
   out ( 'Currency' )
-  intv = intervaler.findstart(budgetSince)
+  intv = intervaler.findstart(start)
   veryend = intervaler.findend(end)
   while intv < veryend:
     out ( intv.isoformat() )
@@ -145,8 +146,7 @@ def plan ( accs, start, budgetSince, end, intervaler ):
   intv = intervaler.findstart(budgetSince)
   veryend = intervaler.findend(end)
   while intv < veryend:
-    intprev = intv
-    intv = intervaler.increment(intv)
+    intvNext = intervaler.increment(intv)
     totalb = 0
     totals = 0
     for acc in accs:
@@ -160,6 +160,7 @@ def plan ( accs, start, budgetSince, end, intervaler ):
       totals += accfuture
     out ( repr(totalb) )
     out ( repr(totals) )
+    intv = intvNext
   outln ()
 
 class ivlWeekly:
